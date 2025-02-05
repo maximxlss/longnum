@@ -26,10 +26,7 @@ inline void LongNum::verify_invariants() const {
     if (sign != 1 && sign != -1) {
         throw std::logic_error(std::format("Sign is not -1 and not 1; it's {}.", sign));
     }
-    if (limbs.size() == 0) {
-        throw std::logic_error("Limbs is empty.");
-    }
-    if (limbs.size() == 1 && limbs[0] == 0 && sign != 1) {
+    if (limbs.size() == 0 && sign != 1) {
         throw std::logic_error(std::format("Sign of zero is not 1; it's {}.", sign));
     }
     if (limbs.size() > 1 && limbs.back() == 0) {
@@ -39,13 +36,10 @@ inline void LongNum::verify_invariants() const {
 }
 
 inline void LongNum::fix_invariants() {
-    if (limbs.size() == 0) {
-        limbs.push_back(0);
-    }
-    while (limbs.size() > 1 && limbs.back() == 0) {
+    while (limbs.size() > 0 && limbs.back() == 0) {
         limbs.pop_back();
     }
-    if (limbs.size() == 1 && limbs[0] == 0) {
+    if (limbs.size() == 0) {
         sign = 1;
     }
     verify_invariants();
@@ -54,7 +48,7 @@ inline void LongNum::fix_invariants() {
 LongNum::LongNum()
     : sign(1),
     binary_point(DEFAULT_PRECISION),
-    limbs(1, 0)
+    limbs()
 {
     verify_invariants();
 }
@@ -79,11 +73,6 @@ LongNum::LongNum(long double value)
         limbs.push_back(mantissa);
         mantissa >>= 32;
     }
-
-    if (limbs.size() == 0) {
-        limbs.push_back(0);
-    }
-
     
     binary_point = -exponent;
 
@@ -283,9 +272,7 @@ LongNum& LongNum::operator<<=(int n) {
     for (int i = 0; i < d; i++) {
         limbs.emplace(limbs.begin(), 0);
     }
-    while (limbs.size() > 1 && limbs.back() == 0) {
-        limbs.pop_back();
-    }
+    fix_invariants();
     verify_invariants();
     return *this;
 }
@@ -344,13 +331,12 @@ LongNum operator*(LongNum lhs, const LongNum& rhs) {
             }
         }
     }
-    while (result.limbs.size() > 1 && result.limbs.back() == 0) {
-        result.limbs.pop_back();
+    result.fix_invariants();
+    if (result.limbs.size() != 0) {
+        result.sign = lhs.sign * rhs.sign;
     }
-    result.sign = lhs.sign * rhs.sign;
     result.binary_point = lhs.binary_point + rhs.binary_point;
     result.set_precision(std::max(lhs.binary_point, rhs.binary_point));
-    result.fix_invariants();
     lhs.verify_invariants();
     rhs.verify_invariants();
     return result;
@@ -464,7 +450,10 @@ void LongNum::unset_bit(int pos) {
 
 int LongNum::bit_length() const {
     verify_invariants();
-    return (limbs.size() - 1) * 32 + (32 - std::countl_zero(limbs.back())) - binary_point;
+    if (limbs.size() == 0) {
+        return -(int)binary_point;
+    }
+    return ((int)limbs.size() - 1) * 32 + (32 - std::countl_zero(limbs.back())) - binary_point;
 }
 
 LongNum LongNum::pow(int e) const {
