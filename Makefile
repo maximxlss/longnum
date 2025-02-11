@@ -3,7 +3,7 @@ ifeq ($(origin CXX),default)
 endif
 
 CXXFLAGS += -g --std=c++23 -pedantic -Wall
-test.coverage: CXXFLAGS += -fprofile-arcs -ftest-coverage -g --std=c++23 -pedantic -Wall
+test.coverage: CXXFLAGS += -fprofile-arcs -ftest-coverage
 
 DEBUG ?= 1
 ifeq ($(DEBUG), 1)
