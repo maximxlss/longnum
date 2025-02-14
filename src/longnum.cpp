@@ -1,6 +1,7 @@
 #include "longnum.hpp"
 #include <cassert>
 #include <cmath>
+#include <algorithm>
 
 const int DEFAULT_PRECISION = 64;
 

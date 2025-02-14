@@ -1,7 +1,3 @@
-ifeq ($(origin CXX),default)
-	CXX = g++-14
-endif
-
 CXXFLAGS += -g --std=c++23 -pedantic -Wall
 test.coverage: CXXFLAGS += -fprofile-arcs -ftest-coverage
 
@@ -55,7 +51,7 @@ test.valgrind: $(BUILD_FOLDER)/tests
 
 test.coverage: $(BUILD_FOLDER)/tests
 	$(BUILD_FOLDER)/tests
-	lcov --capture --directory $(BUILD_FOLDER) --output-file $(BUILD_FOLDER)/coverage.info --gcov-tool gcov-14
+	lcov --capture --directory $(BUILD_FOLDER) --output-file $(BUILD_FOLDER)/coverage.info
 	genhtml $(BUILD_FOLDER)/coverage.info --output-directory $(BUILD_FOLDER)/coverage-report
 
 clean:

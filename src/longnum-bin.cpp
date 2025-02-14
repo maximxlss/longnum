@@ -1,6 +1,6 @@
 #include <iostream>
-#include <print>
 #include <assert.h>
+#include <format>
 #include"../src/longnum.hpp"
 
 
@@ -25,5 +25,5 @@ LongNum calculate_pi(unsigned int precision, unsigned int terms) {
 int main() {
     LongNum x = calculate_pi(350, 350);
 
-    std::print("{}\n", x.to_binary_string());
+    std::cout << std::format("{}\n", x) << std::endl;
 }

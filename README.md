@@ -6,9 +6,7 @@ First-year educational project done at HSE SE: C++ arbitrary precision library. 
 A class `LongNum` that implements fixed-point arithmetic (`+`, `-`, `*`, `/`) with selectable precision (the sizes of the numbers are unbounded though). Internally uses 32-bit limbs for not-terribly-slow computations. See [header file](./src/longnum.hpp) for details about the class exterior.
 
 ### Warning
-Because I love using new stuff for no reason, this _requires_ **GCC 14** or newer.
-
-On ubuntu: `sudo apt install g++-14`
+Requires GCC 13 or newer.
 
 ### Makefile
 Main targets: `run`, `run.vargrind`, `run.time`, `test`, `test.valgrind`, `test.coverage`, `clean`. Some interesting commands:
