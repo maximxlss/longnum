@@ -20,11 +20,8 @@ COMPILE = $(CXX) $(CXXFLAGS)
 
 all: $(BUILD_FOLDER)/longnum.o
 
-build:
-	mkdir build
-
-$(BUILD_FOLDER): | build
-	mkdir $(BUILD_FOLDER)
+$(BUILD_FOLDER):
+	mkdir -p $(BUILD_FOLDER)
 
 $(BUILD_FOLDER)/longnum.o: src/longnum.cpp src/longnum.hpp | $(BUILD_FOLDER)
 	$(COMPILE) $< -c -o $@
