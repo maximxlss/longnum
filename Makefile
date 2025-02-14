@@ -1,13 +1,24 @@
 CXXFLAGS += -g --std=c++23 -pedantic -Wall
-test.coverage: CXXFLAGS += -fprofile-arcs -ftest-coverage
 
-DEBUG ?= 1
-ifeq ($(DEBUG), 1)
-	BUILD_FOLDER=build/debug
+BUILD_FOLDER?=build
+
+RELEASE ?= 0
+ifeq ($(RELEASE), 0)
+	BUILD_FOLDER:=$(BUILD_FOLDER)/debug
 else
-	BUILD_FOLDER=build/release
+	BUILD_FOLDER:=$(BUILD_FOLDER)/release
 	CFLAGS=-DNDEBUG
-	CXXFLAGS += -O3 -flto
+	CXXFLAGS+=-O3 -flto
+endif
+
+COVERAGE ?= 0
+ifeq ($(COVERAGE), 1)
+	BUILD_FOLDER:=$(BUILD_FOLDER)/coverage
+	CFLAGS=-DNDEBUG
+	CXXFLAGS+=-fprofile-arcs -ftest-coverage
+	POST_BUILD_COMMAND+=\
+		lcov --capture --directory $(BUILD_FOLDER) --output-file $(BUILD_FOLDER)/coverage.info;\
+		genhtml $(BUILD_FOLDER)/coverage.info --output-directory $(BUILD_FOLDER)/coverage-report;
 endif
 
 COMPILE = $(CXX) $(CXXFLAGS)
@@ -36,23 +47,23 @@ $(BUILD_FOLDER)/tests: $(BUILD_FOLDER)/tests.o $(BUILD_FOLDER)/longnum.o | $(BUI
 
 run: $(BUILD_FOLDER)/longnum-bin
 	$(BUILD_FOLDER)/longnum-bin
+	$(POST_BUILD_COMMAND)
 
 run.time: $(BUILD_FOLDER)/longnum-bin
 	bash -c "time $(BUILD_FOLDER)/longnum-bin"
+	$(POST_BUILD_COMMAND)
 
 run.valgrind: $(BUILD_FOLDER)/longnum-bin
 	valgrind $(BUILD_FOLDER)/longnum-bin
+	$(POST_BUILD_COMMAND)
 
 test: $(BUILD_FOLDER)/tests
 	$(BUILD_FOLDER)/tests
+	$(POST_BUILD_COMMAND)
 
 test.valgrind: $(BUILD_FOLDER)/tests
 	valgrind $(BUILD_FOLDER)/tests
-
-test.coverage: $(BUILD_FOLDER)/tests
-	$(BUILD_FOLDER)/tests
-	lcov --capture --directory $(BUILD_FOLDER) --output-file $(BUILD_FOLDER)/coverage.info
-	genhtml $(BUILD_FOLDER)/coverage.info --output-directory $(BUILD_FOLDER)/coverage-report
+	$(POST_BUILD_COMMAND)
 
 clean:
 	rm -rf build
