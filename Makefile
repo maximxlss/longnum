@@ -18,7 +18,7 @@ COMPILE = $(CXX) $(CXXFLAGS)
 
 .phony: all run run.time run.valgrind test test.valgrind clean
 
-all: $(BUILD_FOLDER)/longnum
+all: $(BUILD_FOLDER)/longnum.o
 
 build:
 	mkdir build
