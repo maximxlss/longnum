@@ -1,5 +1,4 @@
 {
-    "C_Cpp.default.compilerPath": "g++-14",
     "files.associations": {
         "array": "cpp",
         "atomic": "cpp",
@@ -32,6 +31,7 @@
         "numeric": "cpp",
         "optional": "cpp",
         "random": "cpp",
+        "source_location": "cpp",
         "string_view": "cpp",
         "system_error": "cpp",
         "tuple": "cpp",
@@ -46,14 +46,14 @@
         "new": "cpp",
         "numbers": "cpp",
         "ostream": "cpp",
+        "ranges": "cpp",
         "span": "cpp",
+        "sstream": "cpp",
         "stdexcept": "cpp",
         "streambuf": "cpp",
         "typeinfo": "cpp",
         "variant": "cpp",
-        "cassert": "cpp",
         "print": "cpp",
-        "text_encoding": "cpp",
-        "sstream": "cpp"
+        "text_encoding": "cpp"
     }
 }
