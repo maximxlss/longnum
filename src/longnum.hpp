@@ -81,6 +81,8 @@ struct std::formatter<LongNum> : std::formatter<std::string> {
     }
 };
 
+std::ostream& operator<<(std::ostream& stream, const LongNum& number);
+
 LongNum operator""_longnum(long double value);
 LongNum operator""_longnum(unsigned long long value);
 

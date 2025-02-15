@@ -710,6 +710,10 @@ LongNum LongNum::with_precision(unsigned int precision) const {
     return result;
 }
 
+std::ostream& operator<<(std::ostream& stream, const LongNum& number) {
+    return stream << number.to_string();
+}
+
 LongNum operator""_longnum(long double value) {
     return LongNum(value);
 };
