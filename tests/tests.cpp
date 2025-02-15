@@ -8,4 +8,6 @@ int main() {
     test_longnum_multiplication();
     test_longnum_division();
     test_longnum_utils();
+
+    summary();
 }
