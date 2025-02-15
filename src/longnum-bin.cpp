@@ -8,15 +8,16 @@ LongNum calculate_pi(unsigned int precision, unsigned int terms) {
     LongNum result;
     result.set_precision(precision);
 
+    LongNum term = (2_longnum).with_precision(precision);
+    result += term;
+
     // source: https://math.stackexchange.com/questions/14113/series-that-converge-to-pi-quickly
-    for (int n = 0; n < terms; n++) {
-        LongNum term = (1_longnum).with_precision(precision);
-        term >>= (n - 1);
-        for (int i = 1; i <= n; i++) {
-            term *= i * 2;
-            term /= i * 2 + 1;
-        }
+    for (int n = 1; n < terms; n++) {
+        term >>= 1;
+        term *= n * 2;
+        term /= n * 2 + 1;
         result += term;
+        
     }
 
     return result;
@@ -25,5 +26,5 @@ LongNum calculate_pi(unsigned int precision, unsigned int terms) {
 int main() {
     LongNum x = calculate_pi(350, 350);
 
-    std::cout << std::format("{}\n", x) << std::endl;
+    std::cout << x << std::endl;
 }
