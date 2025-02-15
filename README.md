@@ -9,7 +9,7 @@ A class `LongNum` that implements fixed-point arithmetic (`+`, `-`, `*`, `/`) wi
 Requires GCC 13 or newer.
 
 ### Makefile
-Main targets: `run`, `run.vargrind`, `run.time`, `test`, `test.valgrind`, `clean`. Some interesting commands:
+Main targets: `run`, `run.vargrind`, `run.callgrind`, `run.time`, `test`, `test.valgrind`, `test.callgrind`, `clean`. Some interesting commands:
 - `make run` - build and run `longnum-bin.cpp` (by default calculates pi).
 - `make test` - test the library.
 - `COVERAGE=1 make test` - test the tests coverage (currently 96% lines, 100% functions).

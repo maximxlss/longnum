@@ -57,12 +57,20 @@ run.valgrind: $(BUILD_FOLDER)/longnum-bin
 	valgrind $(BUILD_FOLDER)/longnum-bin
 	$(POST_BUILD_COMMAND)
 
+run.callgrind: $(BUILD_FOLDER)/longnum-bin
+	valgrind --tool=callgrind --dump-instr=yes --collect-jumps=yes $(BUILD_FOLDER)/longnum-bin
+	$(POST_BUILD_COMMAND)
+
 test: $(BUILD_FOLDER)/tests
 	$(BUILD_FOLDER)/tests
 	$(POST_BUILD_COMMAND)
 
 test.valgrind: $(BUILD_FOLDER)/tests
 	valgrind $(BUILD_FOLDER)/tests
+	$(POST_BUILD_COMMAND)
+
+test.callgrind: $(BUILD_FOLDER)/tests
+	valgrind --tool=callgrind --dump-instr=yes --collect-jumps=yes $(BUILD_FOLDER)/tests
 	$(POST_BUILD_COMMAND)
 
 clean:
