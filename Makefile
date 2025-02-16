@@ -33,10 +33,10 @@ $(BUILD_FOLDER):
 $(BUILD_FOLDER)/longnum.o: src/longnum.cpp src/longnum.hpp | $(BUILD_FOLDER)
 	$(COMPILE) $< -c -o $@
 
-$(BUILD_FOLDER)/longnum-bin.o: src/longnum-bin.cpp | $(BUILD_FOLDER)
+$(BUILD_FOLDER)/longnum-bin.o: src/longnum-bin.cpp src/longnum.hpp | $(BUILD_FOLDER)
 	$(COMPILE) $< -c -o $@
 
-$(BUILD_FOLDER)/tests.o: tests/tests.cpp tests/utils.hpp tests/longnum-tests.cpp | $(BUILD_FOLDER)
+$(BUILD_FOLDER)/tests.o: tests/tests.cpp src/longnum.hpp tests/utils.hpp tests/longnum-tests.cpp | $(BUILD_FOLDER)
 	$(COMPILE) $< -c -o $@
 
 $(BUILD_FOLDER)/longnum-bin: $(BUILD_FOLDER)/longnum-bin.o $(BUILD_FOLDER)/longnum.o | $(BUILD_FOLDER)
