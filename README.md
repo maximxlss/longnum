@@ -1,9 +1,12 @@
 # LongNum arbitrary precision library
 
-First-year educational project done at HSE SE: C++ arbitrary precision library. Supports handling fixed-point arithmetic of arbitrary precision, kinda fast and questionably safe 🤔
+First-year educational project done at HSE SE: C++ arbitrary precision library. Supports handling ~~fixed-point~~ floating-point arithmetic of arbitrary precision, kinda fast and questionably safe 🤔
+
+### ❕Floating-point branch
+You are on a branch containing a rewritten library with floating-point arithmetic instead of fixed-point. I hoped for a big speedup, since this implementation does *way* less copying, but it seems I've made a mistake somewhere or something idk. This also is NOT what was asked from me (the implementation should be fixed-point) so this is now very much useless.
 
 ### Description
-A class `LongNum` that implements fixed-point arithmetic (`+`, `-`, `*`, `/`) with selectable precision (the sizes of the numbers are unbounded though). Internally uses 32-bit limbs for not-terribly-slow computations. See [header file](./src/longnum.hpp) for details about the class exterior.
+A class `LongNum` that implements ~~fixed-point~~ floating-point arithmetic (`+`, `-`, `*`, `/`) with selectable precision (the sizes of the numbers are unbounded though). Internally uses 32-bit limbs for not-terribly-slow computations. See [header file](./src/longnum.hpp) for details about the class exterior.
 
 ### Warning
 Requires GCC 13 or newer.
@@ -37,5 +40,4 @@ int main() {
 ```
 
 ### Roadmap
-- Make limbs lazily allocated or copied for a dramatic speedup.
 - Implement Karatsuba multiplication and some division algorithm, maybe.
