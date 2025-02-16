@@ -25,13 +25,16 @@ void assert(bool value, std::string message = "", std::source_location loc = std
 
 template<typename X, typename Y> requires requires(X x, Y y) { x == y; }
 void assert_eq(X x, Y y, std::source_location loc = std::source_location::current()) {
+    bool value = x == y;
     std::stringstream message;
     if constexpr (requires { message << x; message << y; }) {
-        message << x;
-        message << " != ";
-        message << y;
+        if (!value) {
+            message << x;
+            message << " != ";
+            message << y;
+        }
     }
-    assert(x == y, message.str(), loc);
+    assert(value, message.str(), loc);
 }
 
 void summary() {
