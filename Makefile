@@ -36,10 +36,16 @@ $(BUILD_FOLDER)/longnum.o: src/longnum.cpp src/longnum.hpp | $(BUILD_FOLDER)
 $(BUILD_FOLDER)/longnum-bin.o: src/longnum-bin.cpp src/longnum.hpp | $(BUILD_FOLDER)
 	$(COMPILE) $< -c -o $@
 
+$(BUILD_FOLDER)/calculate_pi.o: src/calculate_pi.cpp src/longnum.hpp | $(BUILD_FOLDER)
+	$(COMPILE) $< -c -o $@
+
 $(BUILD_FOLDER)/tests.o: tests/tests.cpp src/longnum.hpp tests/utils.hpp tests/longnum-tests.cpp | $(BUILD_FOLDER)
 	$(COMPILE) $< -c -o $@
 
 $(BUILD_FOLDER)/longnum-bin: $(BUILD_FOLDER)/longnum-bin.o $(BUILD_FOLDER)/longnum.o | $(BUILD_FOLDER)
+	$(COMPILE) $^ -o $@
+
+$(BUILD_FOLDER)/calculate_pi: $(BUILD_FOLDER)/calculate_pi.o $(BUILD_FOLDER)/longnum.o | $(BUILD_FOLDER)
 	$(COMPILE) $^ -o $@
 
 $(BUILD_FOLDER)/tests: $(BUILD_FOLDER)/tests.o $(BUILD_FOLDER)/longnum.o | $(BUILD_FOLDER)
@@ -71,6 +77,14 @@ test.valgrind: $(BUILD_FOLDER)/tests
 
 test.callgrind: $(BUILD_FOLDER)/tests
 	valgrind --tool=callgrind --dump-instr=yes --collect-jumps=yes $(BUILD_FOLDER)/tests
+	$(POST_BUILD_COMMAND)
+
+pi: $(BUILD_FOLDER)/calculate_pi
+	$(BUILD_FOLDER)/calculate_pi $(DIGITS)
+	$(POST_BUILD_COMMAND)
+
+pi.time: $(BUILD_FOLDER)/calculate_pi
+	bash -c "time $(BUILD_FOLDER)/calculate_pi $(DIGITS)"
 	$(POST_BUILD_COMMAND)
 
 clean:
