@@ -33,13 +33,6 @@ int main() {
 
     // Create another from expression (builtin types are converted automatically)
     LongNum y = 2 * x + 123;
-
-    assert(y / LongNum(10).pow(100) == 0);
-    // Not enough precision!
-
-    y.set_precision(500);
-    assert(y / LongNum(10).pow(100) != 0);
-    // The precision of the result is picked to be the maximum between operands
 }
 ```
 
