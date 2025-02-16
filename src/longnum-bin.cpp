@@ -1,10 +1,11 @@
 #include <iostream>
 #include <assert.h>
 #include <format>
+#include <cmath>
 #include"../src/longnum.hpp"
 
 
-LongNum calculate_pi(unsigned int precision, unsigned int terms) {
+LongNum calculate_pi(std::size_t precision) {
     LongNum result;
     result.set_precision(precision);
 
@@ -12,19 +13,23 @@ LongNum calculate_pi(unsigned int precision, unsigned int terms) {
     result += term;
 
     // source: https://math.stackexchange.com/questions/14113/series-that-converge-to-pi-quickly
-    for (int n = 1; n < terms; n++) {
+    for (int n = 1; n <= precision; n++) {
         term >>= 1;
         term *= n * 2;
         term /= n * 2 + 1;
+        term.set_precision(precision - n + 2);
         result += term;
-        
     }
+
+    result.set_precision(precision);
 
     return result;
 }
 
 int main() {
-    LongNum x = calculate_pi(350, 350);
+    const int N_DIGITS = 100;
 
-    std::cout << x << std::endl;
+    LongNum x = calculate_pi((N_DIGITS + 2) * std::log2l(10));
+
+    std::cout << x.to_string().substr(0, 2 + N_DIGITS) << std::endl;
 }
