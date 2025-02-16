@@ -6,23 +6,38 @@
 #include <iostream>
 #include <string>
 #include <format>
+#include "significand.hpp"
 
 class LongNum {
-    int sign;
-    unsigned int binary_point;
-    std::vector<uint32_t> limbs;
+    Significand limbs;
 
-    LongNum(int _sign, unsigned int _binary_point, std::vector<uint32_t> _limbs);
+    // the exponent, EXP_ZERO is a marker for the whole number to be zero
+    int _exp = EXP_ZERO;
 
-    inline void verify_invariants() const;
-    inline void fix_invariants();
+    // is the number negative or not
+    bool _is_negative = false;
 
 public:
-    LongNum();
+    static const int EXP_ZERO = std::numeric_limits<int>::min();
+
+    LongNum() = default;
+    LongNum(const LongNum&) = default;
+    LongNum(LongNum&&) = default;
+    ~LongNum() = default;
+
+    LongNum& operator=(const LongNum&) = default;
+    LongNum& operator=(LongNum&&) = default;
+
     LongNum(long double value);
 
-    LongNum(const LongNum&) = default;
-    LongNum& operator=(LongNum other);
+    bool is_zero() const;
+    bool is_negative() const;
+    int exp() const;
+
+    std::size_t precision() const;
+    void set_precision(std::size_t precision);
+    LongNum with_precision(std::size_t precision) &&;
+    LongNum with_precision(std::size_t precision) const&;
 
     std::strong_ordering operator<=>(const LongNum& rhs) const;
     bool operator==(const LongNum& rhs) const;
@@ -30,36 +45,27 @@ public:
     LongNum& operator+=(const LongNum& rhs);
     friend LongNum operator+(LongNum lhs, const LongNum& rhs);
 
-    LongNum operator-() const;
+    friend LongNum operator-(LongNum value);
     LongNum& operator-=(const LongNum& rhs);
     friend LongNum operator-(LongNum lhs, const LongNum& rhs);
 
-    // this coincides with multiplication/division by a power of two!
-    // internally just a shift
+    // you can interpret this as multiplication/division by a power of two
     LongNum& operator<<=(int rhs);
     friend LongNum operator<<(LongNum lhs, int rhs);
     LongNum& operator>>=(int rhs);
     friend LongNum operator>>(LongNum lhs, int rhs);
     
-    friend LongNum operator*(LongNum lhs, const LongNum& rhs);
+    friend LongNum operator*(const LongNum& lhs, const LongNum& rhs);
     LongNum& operator*=(const LongNum& rhs);
 
     LongNum& operator/=(const LongNum& rhs);
     friend LongNum operator/(LongNum lhs, const LongNum& rhs);
 
-    // bits left of the binary point are adressed by negative indicies
-    bool get_bit(int pos) const;
-    void set_bit(int pos);
-    void unset_bit(int pos);
-
-    // for numbers >= 1 it's the bit length of the whole part
-    // for others it counts the number of zeros, but negative
-    int bit_length() const;
-
     LongNum pow(int e) const;
     LongNum truncate() const;
     LongNum frac() const;
     LongNum round() const;
+    LongNum abs() const;
 
     int to_int() const;
     
@@ -68,10 +74,6 @@ public:
 
     std::string to_string(unsigned int base = 10) const;
     static LongNum from_string(const std::string& number, unsigned int base = 10);
-
-    unsigned int precision() const;
-    void set_precision(unsigned int precision);
-    LongNum with_precision(unsigned int precision) const;
 };
 
 template <>

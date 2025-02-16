@@ -30,7 +30,7 @@ all: $(BUILD_FOLDER)/longnum.o
 $(BUILD_FOLDER):
 	mkdir -p $(BUILD_FOLDER)
 
-$(BUILD_FOLDER)/longnum.o: src/longnum.cpp src/longnum.hpp | $(BUILD_FOLDER)
+$(BUILD_FOLDER)/longnum.o: src/longnum.cpp src/longnum.hpp src/significand.hpp | $(BUILD_FOLDER)
 	$(COMPILE) $< -c -o $@
 
 $(BUILD_FOLDER)/longnum-bin.o: src/longnum-bin.cpp src/longnum.hpp | $(BUILD_FOLDER)

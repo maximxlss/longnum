@@ -2,459 +2,334 @@
 #include <cassert>
 #include <cmath>
 #include <algorithm>
+#include <ranges>
+#include<sstream>
 
-const int DEFAULT_PRECISION = 64;
 
-inline void add_limbs(uint32_t& lhs, uint32_t rhs, int& carry) {
+void add_limbs(uint32_t& lhs, uint32_t rhs, int& carry) {
     uint64_t result = (uint64_t)lhs + rhs + carry;
     lhs = result;
     carry = result >> 32;
 }
 
-inline void sub_limbs(uint32_t& lhs, uint32_t rhs, int& carry) {
+void sub_limbs(uint32_t& lhs, uint32_t rhs, int& carry) {
     int new_carry = lhs < rhs || (lhs <= rhs && carry);
     lhs -= rhs;
     lhs -= carry;
     carry = new_carry;
 }
 
-LongNum::LongNum(int _sign, unsigned int _binary_point, std::vector<uint32_t> _limbs) : sign(_sign), binary_point(_binary_point), limbs(std::move(_limbs))  {
-    fix_invariants();
-}
+LongNum::LongNum(long double value) {
+    if (value == 0) {
+        return;
+    }
 
-inline void LongNum::verify_invariants() const {
-    #ifndef NDEBUG
-    if (sign != 1 && sign != -1) {
-        throw std::logic_error(std::format("Sign is not -1 and not 1; it's {}.", sign));
-    }
-    if (limbs.size() == 0 && sign != 1) {
-        throw std::logic_error(std::format("Sign of zero is not 1; it's {}.", sign));
-    }
-    if (limbs.size() > 1 && limbs.back() == 0) {
-        throw std::logic_error("Back limb is zero.");
-    }
-    #endif
-}
-
-inline void LongNum::fix_invariants() {
-    while (limbs.size() > 0 && limbs.back() == 0) {
-        limbs.pop_back();
-    }
-    if (limbs.size() == 0) {
-        sign = 1;
-    }
-    verify_invariants();
-}
-
-LongNum::LongNum()
-    : sign(1),
-    binary_point(DEFAULT_PRECISION),
-    limbs()
-{
-    verify_invariants();
-}
-
-LongNum::LongNum(long double value)
-    : sign(1),
-    binary_point(0),
-    limbs()
-{
     int exponent;
     value = std::frexp(value, &exponent);
+    _exp = exponent - 1;
     
     if (value < 0) {
-        sign = -1;
+        _is_negative = true;
         value = -value;
     }
 
-    unsigned long long mantissa = scalb(value, std::numeric_limits<double>::digits);
-    exponent -= std::numeric_limits<double>::digits;
+    value = std::ldexp(value, 1) - 1;
     
-    while (mantissa) {
-        limbs.push_back(mantissa);
-        mantissa >>= 32;
+    std::vector<uint32_t> _limbs;
+    while (value) {
+        value = std::ldexp(value, 32);
+        long double float_limb;
+        value = std::modf(value, &float_limb);
+        _limbs.emplace_back(float_limb);
     }
-    
-    binary_point = -exponent;
+    limbs = Significand(std::move(_limbs));
 
-    if (binary_point < DEFAULT_PRECISION) {
-        set_precision(DEFAULT_PRECISION);
+    if constexpr (std::numeric_limits<long double>::radix == 2) {
+        set_precision(std::numeric_limits<long double>::digits);
+    } else {
+        // (will never happen) fallback to approximate precision
+        set_precision(std::numeric_limits<long double>::digits10 * 4);
     }
-
-    verify_invariants();
 }
 
+bool LongNum::is_zero() const {
+    return _exp == EXP_ZERO;
+}
 
-LongNum& LongNum::operator=(LongNum rhs) {
-    std::swap(sign, rhs.sign);
-    std::swap(binary_point, rhs.binary_point);
-    std::swap(limbs, rhs.limbs);
+bool LongNum::is_negative() const {
+    return _is_negative;
+}
+
+int LongNum::exp() const {
+    return _exp;
+}
+
+std::size_t LongNum::precision() const {
+    return limbs.precision();
+}
+
+void LongNum::set_precision(std::size_t precision) {
+    limbs.set_precision(precision);
+}
+
+LongNum LongNum::with_precision(std::size_t precision) && {
+    set_precision(precision);
     return *this;
 }
 
+LongNum LongNum::with_precision(std::size_t precision) const& {
+    LongNum result = *this;
+    result.set_precision(precision);
+    return result;
+}
+
 std::strong_ordering LongNum::operator<=>(const LongNum& rhs) const {
-    verify_invariants();
-    if (sign > rhs.sign) {
-        return std::strong_ordering::greater;
-    } else if (sign < rhs.sign) {
-        return std::strong_ordering::less;
-    } else if (bit_length() > rhs.bit_length()) {
-        return sign > 0 ? std::strong_ordering::greater : std::strong_ordering::less;
-    } else if (bit_length() < rhs.bit_length()) {
-        return sign > 0 ? std::strong_ordering::less : std::strong_ordering::greater;
+    if (is_zero() && !rhs.is_zero()) {
+        return rhs.is_negative() ? std::strong_ordering::greater : std::strong_ordering::less;
+    } else if (!is_zero() && rhs.is_zero()) {
+        return is_negative() ? std::strong_ordering::less : std::strong_ordering::greater;
+    } else if (is_zero() && rhs.is_zero()) {
+        return std::strong_ordering::equal;
+    } else if (is_negative() != rhs.is_negative()) {
+        return is_negative() ? std::strong_ordering::less : std::strong_ordering::greater;;
+    } else if (exp() != rhs.exp()) {
+        return (exp() > rhs.exp()) ^ is_negative() ? std::strong_ordering::greater : std::strong_ordering::less;
     }
-    if (binary_point > rhs.binary_point) {
-        // fixme: slower but complicated to improve (see operator<<=)
-        LongNum new_rhs = rhs;
-        new_rhs.set_precision(binary_point);
-        return *this <=> new_rhs;
-    } else if (binary_point != rhs.binary_point) {
-        LongNum new_lhs = *this;
-        new_lhs.set_precision(rhs.binary_point);
-        return new_lhs <=> rhs;
-    }
-    for (int i = limbs.size() - 1; i >= 0; i--) {
-        if (limbs[i] > rhs.limbs[i]) {
-            return sign > 0 ? std::strong_ordering::greater : std::strong_ordering::less;
-        } else if (limbs[i] < rhs.limbs[i]) {
-            return sign > 0 ? std::strong_ordering::less : std::strong_ordering::greater;
+    std::size_t cmp_precision = std::max(precision(), rhs.precision());
+    Significand cmp_left = limbs.with_precision(cmp_precision);
+    Significand cmp_right = rhs.limbs.with_precision(cmp_precision);
+    std::size_t max_i = cmp_left.size();
+    for (int i = 0; i < (int)max_i; i++) {
+        if (cmp_left.get(i) != cmp_right.get(i)) {
+            return (cmp_left.get(i) > cmp_right.get(i)) ^ is_negative() ? std::strong_ordering::greater : std::strong_ordering::less;
         }
     }
     return std::strong_ordering::equal;
 }
 
 bool LongNum::operator==(const LongNum& rhs) const {
-    verify_invariants();
-    rhs.verify_invariants();
-    if (binary_point > rhs.binary_point) {
-        // fixme: slower but complicated to improve (see operator<<=)
-        LongNum new_rhs = rhs;
-        new_rhs.set_precision(binary_point);
-        return *this == new_rhs;
-    } else if (binary_point != rhs.binary_point) {
-        return rhs == *this;
+    if (is_zero() && rhs.is_zero()) {
+        return true;
+    } else if (is_zero() || rhs.is_zero()) {
+        return false;
+    } else if (is_negative() != rhs.is_negative()) {
+        return false;
+    } else if (exp() != rhs.exp()) {
+        return false;
     }
-    return limbs == rhs.limbs && sign == rhs.sign;
+    std::size_t cmp_precision = std::max(precision(), rhs.precision());
+    Significand cmp_left = limbs.with_precision(cmp_precision);
+    Significand cmp_right = rhs.limbs.with_precision(cmp_precision);
+    std::size_t max_i = cmp_left.size();
+    for (int i = 0; i < (int)max_i; i++) {
+        if (cmp_left.get(i) != cmp_right.get(i)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 LongNum& LongNum::operator+=(const LongNum& rhs) {
-    verify_invariants();
-    rhs.verify_invariants();
-    if (rhs == 0) {
+    if (precision() < rhs.precision()) {
+        set_precision(rhs.precision());
+    }
+    if (rhs.is_zero()) {
         return *this;
     }
-    if (binary_point < rhs.binary_point) {
-        set_precision(rhs.binary_point);
-    }
-    if (binary_point > rhs.binary_point) {
-        // fixme: slower but complicated to improve (see operator<<=)
-        LongNum new_rhs = rhs;
-        new_rhs.set_precision(binary_point);
-        *this += new_rhs;
+    if (is_zero()) {
+        *this = rhs.with_precision(precision());
         return *this;
     }
-    // ensure sign lhs = sign rhs or fall back to subtraction
-    if (sign != rhs.sign) {
+    // ensure same sign or fall back to subtraction
+    if (is_negative() != rhs.is_negative()) {
         *this -= -rhs;
         return *this;
     }
+    // add the one from the rhs to make exp() >= rhs.exp()
+    if (rhs.exp() > exp()) {
+        limbs.insert_front_zeros(rhs.exp() - exp());
+        _exp = rhs.exp();
+    }
     int carry = 0;
-    for (int i = 0; i < (int)std::max(limbs.size(), rhs.limbs.size()); i++) {
-        if (i >= (int)limbs.size()) {
-            limbs.emplace_back(0);
-        }
-        add_limbs(limbs[i], i < (int)rhs.limbs.size() ? rhs.limbs[i] : 0, carry);
+    for (int i = limbs.size() - 1; i >= 0; i--) {
+        add_limbs(limbs.at(i), rhs.limbs.get_with_offset(rhs.exp() - exp(), i), carry);
     }
-    if (carry == 1) {
-        limbs.emplace_back(1);
+    // leading one was missed
+    if (rhs.exp() == exp()) {
+        carry += 1;
     }
-    verify_invariants();
-    rhs.verify_invariants();
+    if (carry >= 1) {
+        limbs.insert_front_zeros(1);
+        _exp += 1;
+    }
+    if (carry == 2) {
+        limbs.set_bit(0);
+    }
     return *this;
 }
 
 LongNum operator+(LongNum lhs, const LongNum& rhs) {
-    lhs.verify_invariants();
-    rhs.verify_invariants();
     lhs += rhs;
-    lhs.verify_invariants();
-    rhs.verify_invariants();
     return lhs;
 }
 
-LongNum LongNum::operator-() const {
-    // fixme: would be used inefficiently with a copy
-    // even when not needed
-    // maybe some kind of no-copy views
-    verify_invariants();
-    LongNum result(*this);
-    if (result != 0) {
-        result.sign = -result.sign;
+LongNum operator-(LongNum value) {
+    if (!value.is_zero()) {
+        value._is_negative = !value._is_negative;
     }
-    result.verify_invariants();
-    return result;
+    return value;
 }
 
 LongNum& LongNum::operator-=(const LongNum& rhs) {
-    verify_invariants();
-    rhs.verify_invariants();
-    if (rhs == 0) {
+    if (precision() < rhs.precision()) {
+        set_precision(rhs.precision());
+    }
+    if (rhs.is_zero()) {
+        return *this;
+    }
+    if (is_zero()) {
+        *this = -rhs.with_precision(precision());
         return *this;
     }
     if (*this == rhs) {
-        *this = 0;
+        *this = (0_longnum).with_precision(precision());
         return *this;
     }
-    if (binary_point < rhs.binary_point) {
-        set_precision(rhs.binary_point);
-    }
-    if (binary_point > rhs.binary_point) {
-        // fixme: slower but complicated to improve (see operator<<=)
-        LongNum new_rhs = rhs;
-        new_rhs.set_precision(binary_point);
-        *this -= new_rhs;
-        return *this;
-    }
-    // ensure |lhs| > |rhs| or fall back to addition
-    if (sign != rhs.sign) {
+    // ensure same signs and |lhs| > |rhs| or fall back to addition
+    if (is_negative() != rhs.is_negative()) {
         *this += -rhs;
         return *this;
     }
-    if ((*this < rhs) ^ (sign < 0)) {
-        *this = -(rhs - *this);
+    if (abs() < rhs.abs()) {
+        *this = -(rhs.with_precision(precision()) - *this);
         return *this;
     }
+    // assume exp() >= rhs.exp() because |lhs| > |rhs|
     int carry = 0;
-    for (int i = 0; i < (int)limbs.size(); i++) {
-        sub_limbs(limbs[i], i < (int)rhs.limbs.size() ? rhs.limbs[i] : 0, carry);
+    for (int i = limbs.size() - 1; i >= 0; i--) {
+        sub_limbs(limbs.at(i), rhs.limbs.get_with_offset(rhs.exp() - exp(), i), carry);
     }
-    assert(carry == 0);
-    fix_invariants();
-    rhs.verify_invariants();
+    // leading one was missed
+    if (rhs.exp() == exp()) {
+        carry += 1;
+    }
+    assert(carry <= 1);
+    if (carry == 1) {
+        std::size_t leading_zeros = limbs.leading_zeros();
+        limbs.remove_front_bits(leading_zeros + 1);
+        _exp -= leading_zeros + 1;
+    }
     return *this;
 }
 
 LongNum operator-(LongNum lhs, const LongNum& rhs) {
-    lhs.verify_invariants();
-    rhs.verify_invariants();
     lhs -= rhs;
-    lhs.verify_invariants();
-    rhs.verify_invariants();
     return lhs;
 }
 
 LongNum& LongNum::operator<<=(int n) {
-    // fixme: used inefficiently with a copy in many places
-    // maybe fix with "shifted" no-copy views?
-    // or restricting binary_point to 32-multiples
-    // though doesn't matter with a fixed precision
-    verify_invariants();
-    if (n == 0) {
-        return *this;
-    } else if (n < 0) {
-        *this >>= -n;
-        return *this;
-    }
-    int r = n % 32;
-    if (r != 0) {
-        uint32_t carry = 0;
-        for (int i = 0; i < (int)limbs.size(); i++) {
-            uint32_t new_carry = limbs[i] >> (32 - r);
-            limbs[i] <<= r;
-            limbs[i] |= carry;
-            carry = new_carry;
-        }
-        if (carry) {
-            limbs.emplace_back(carry);
-        }
-    }
-    int d = n / 32;
-    // fixme: slower but c++23 insert_range is not available for some reason
-    for (int i = 0; i < d; i++) {
-        limbs.emplace(limbs.begin(), 0);
-    }
-    fix_invariants();
-    verify_invariants();
+    _exp += n;
     return *this;
 }
 
 LongNum operator<<(LongNum lhs, int n) {
-    lhs.verify_invariants();
     lhs <<= n;
-    lhs.verify_invariants();
     return lhs;
 }
 
 LongNum& LongNum::operator>>=(int n) {
-    verify_invariants();
-    if (n == 0) {
-        return *this;
-    } else if (n < 0) {
-        *this <<= -n;
-        return *this;
-    }
-    int d = std::min(n / 32, (int)limbs.size());
-    limbs.erase(limbs.begin(), limbs.begin() + d);
-    int r = n % 32;
-    if (r != 0) {
-        uint32_t carry = 0;
-        for (int i = limbs.size() - 1; i >= 0; i--) {
-            uint32_t new_carry = limbs[i] << (32 - r);
-            limbs[i] >>= r;
-            limbs[i] |= carry;
-            carry = new_carry;
-        }
-    }
-    fix_invariants();
+    _exp -= n;
     return *this;
 }
 
 LongNum operator>>(LongNum lhs, int n) {
-    lhs.verify_invariants();
     lhs >>= n;
-    lhs.verify_invariants();
     return lhs;
 }
 
-LongNum operator*(LongNum lhs, const LongNum& rhs) {
-    lhs.verify_invariants();
-    rhs.verify_invariants();
-    LongNum result;
-    result.limbs.resize(lhs.limbs.size() + rhs.limbs.size(), 0);
-    for (int i = 0; i < (int)rhs.limbs.size(); i++) {
-        for (int j = 0; j < (int)lhs.limbs.size(); j++) {
-            uint64_t limb_result = (uint64_t)result.limbs[i + j] + (uint64_t)lhs.limbs[j] * (uint64_t)rhs.limbs[i];
-            result.limbs[i + j] = limb_result;
-            int carry = 0;
-            add_limbs(result.limbs[i + j + 1], limb_result >> 32, carry);
-            for (int k = i + j + 2; k < (int)result.limbs.size(); k++) {
-                add_limbs(result.limbs[k], 0, carry);
+LongNum operator*(const LongNum& lhs, const LongNum& rhs) {
+    LongNum result = rhs;
+    if (lhs.is_zero() || rhs.is_zero()) {
+        return (0_longnum).with_precision(std::max(lhs.precision(), rhs.precision()));
+    }
+    result._exp += lhs.exp();
+    result.set_precision(lhs.precision() + rhs.precision() + 32);
+    int big_carry = 0;
+    for (int i = lhs.limbs.size() - 1; i >= 0; i--) {
+        for (int j = rhs.limbs.size() - 1; j >= -1; j--) {
+            uint64_t mult = j >= 0 ? rhs.limbs.get(j) : 1;
+            uint64_t limb_result = (uint64_t)result.limbs.get(i + j + 1) + (uint64_t)lhs.limbs.get(i) * mult;
+            result.limbs.at(i + j + 1) = limb_result;
+            if (i + j < 0) {
+                big_carry += limb_result >> 32;
+                continue;
             }
+            int carry = 0;
+            add_limbs(result.limbs.at(i + j), limb_result >> 32, carry);
+            for (int k = i + j - 1; carry && k >= 0; k--) {
+                add_limbs(result.limbs.at(k), 0, carry);
+            }
+            big_carry += carry;
         }
     }
-    result.fix_invariants();
-    if (result.limbs.size() != 0) {
-        result.sign = lhs.sign * rhs.sign;
+    assert(big_carry <= 2);
+    if (big_carry >= 1) {
+        result.limbs.insert_front_zeros(1);
+        result._exp += 1;
     }
-    result.binary_point = lhs.binary_point + rhs.binary_point;
-    result.set_precision(std::max(lhs.binary_point, rhs.binary_point));
-    lhs.verify_invariants();
-    rhs.verify_invariants();
+    if (big_carry == 2) {
+        result.limbs.set_bit(0);
+    }
+    result.set_precision(std::max(lhs.precision(), rhs.precision()));
+    result._is_negative = lhs.is_negative() ^ rhs.is_negative();
     return result;
 }
 
 LongNum& LongNum::operator*=(const LongNum& rhs) {
-    verify_invariants();
-    rhs.verify_invariants();
     *this = *this * rhs;
-    verify_invariants();
-    rhs.verify_invariants();
     return *this;
 }
 
 LongNum& LongNum::operator/=(const LongNum& rhs) {
-    verify_invariants();
-    rhs.verify_invariants();
-    if (rhs == 0) {
+    if (rhs.is_zero()) {
         throw std::invalid_argument("Division by zero.");
     }
-    if (*this == 0) {
+    if (precision() < rhs.precision()) {
+        set_precision(rhs.precision());
+    }
+    if (is_zero()) {
         return *this;
     }
-    if (binary_point > rhs.binary_point) {
-        LongNum new_rhs = rhs;
-        new_rhs.set_precision(binary_point);
-        *this /= new_rhs;
-        return *this;
-    }
-    int result_sign = sign * rhs.sign;
-    if (sign != rhs.sign) {
+    LongNum result;
+    result.set_precision(std::max(precision(), rhs.precision()));
+    result._is_negative = is_negative() ^ rhs.is_negative();
+    result._exp = exp() - rhs.exp();
+    if (is_negative() != rhs.is_negative()) {
         *this = -*this;
     }
-    
-    LongNum result;
-    result.set_precision(std::max(binary_point, rhs.binary_point));
-    while (*this != 0) {
-        int shift = bit_length() - rhs.bit_length();
-        if (shift < -(int)result.binary_point) {
-            break;
-        }
-        LongNum shifted = rhs << shift;
-        if (((*this > shifted) ^ (sign < 0)) || (*this == shifted)) {
+    _exp = rhs.exp();
+    bool leading_bit = abs() >= rhs.abs();
+    if (leading_bit) {
+        *this -= rhs;
+    }
+    for (int shift = 1; !is_zero() && shift < (int)result.precision(); shift++) {
+        LongNum shifted = rhs >> shift;
+        if (abs() >= shifted.abs()) {
             *this -= shifted;
-            result.set_bit(shift);
-        } else {
-            if (shift <= -(int)result.binary_point) {
-                break;
-            }
-            shifted >>= 1;
-            *this -= shifted;
-            result.set_bit(shift - 1);
+            result.limbs.set_bit(shift - 1);
         }
     }
-    result.sign = result_sign;
-    result.fix_invariants();
+    if (!leading_bit) {
+        result.limbs.remove_front_bits(1);
+        result._exp -= 1;
+    }
     *this = result;
-    verify_invariants();
-    rhs.verify_invariants();
     return *this;
 }
 
 LongNum operator/(LongNum lhs, const LongNum& rhs) {
-    lhs.verify_invariants();
-    rhs.verify_invariants();
     lhs /= rhs;
-    lhs.verify_invariants();
-    rhs.verify_invariants();
     return lhs;
-}
-
-bool LongNum::get_bit(int pos) const {
-    verify_invariants();
-    pos += binary_point;
-    if (pos < 0) {
-        throw std::invalid_argument("Trying to get a bit out of bounds");
-    }
-    unsigned int d = pos / 32;
-    unsigned int r = pos % 32;
-    bool result = (limbs[d] >> r) & 1;
-    verify_invariants();
-    return result;
-}
-
-void LongNum::set_bit(int pos) {
-    verify_invariants();
-    pos += binary_point;
-    if (pos < 0) {
-        throw std::invalid_argument("Trying to get a bit out of bounds");
-    }
-    unsigned int d = pos / 32;
-    unsigned int r = pos % 32;
-    limbs.resize(std::max((unsigned int)limbs.size(), d + 1), 0);
-    limbs[d] |= 1 << r;
-    verify_invariants();
-}
-
-void LongNum::unset_bit(int pos) {
-    verify_invariants();
-    pos += binary_point;
-    if (pos < 0) {
-        throw std::invalid_argument("Trying to get a bit out of bounds");
-    }
-    unsigned int d = pos / 32;
-    if (d < limbs.size()) {
-        unsigned int r = pos % 32;
-        limbs[d] &= ~((uint32_t)1 << r);
-    }
-    fix_invariants();
-}
-
-int LongNum::bit_length() const {
-    verify_invariants();
-    if (limbs.size() == 0) {
-        return -(int)binary_point;
-    }
-    return ((int)limbs.size() - 1) * 32 + (32 - std::countl_zero(limbs.back())) - binary_point;
 }
 
 LongNum LongNum::pow(int e) const {
@@ -471,10 +346,11 @@ LongNum LongNum::pow(int e) const {
 }
 
 LongNum LongNum::truncate() const {
-    LongNum result = *this;
-    result.set_precision(0);
-    result.set_precision(DEFAULT_PRECISION);
-    return result;
+    if (exp() < 0) {
+        return 0;
+    } else {
+        return with_precision(exp()).with_precision(precision());
+    }
 }
 
 LongNum LongNum::frac() const {
@@ -492,51 +368,62 @@ LongNum LongNum::round() const {
     return result;
 }
 
+LongNum LongNum::abs() const {
+    LongNum result = *this;
+    if (result.is_negative()) {
+        result = -result;
+    }
+    return result;
+}
+
 int LongNum::to_int() const {
-    int d = binary_point / 32;
-    int r = binary_point % 32;
-    uint32_t result = 0;
-    if (d < (int)limbs.size()) {
-        result |= limbs[d] >> r;
+    if (is_zero() || exp() < 0) {
+        return 0;
     }
-    if (d + 1 < (int)limbs.size() && r != 0) {
-        result |= limbs[d + 1] << (32 - r);
+    if (exp() >= 31) {
+        throw std::invalid_argument("Overflow");
     }
-    result &= 0x7FFFFFFF;
-    return sign * (int) result;
+    int sign = is_negative() ? -1 : 1;
+    uint32_t num = limbs.get_with_offset(-1, 0);
+    num >>= 31 - exp();
+    return (int)num * sign;
 }
 
 // simpler specialization for binary
 std::string LongNum::to_binary_string() const {
-    verify_invariants();
-    std::string result;
-    for (int i = 0; i < (int)limbs.size(); i++) {
-        uint64_t x = limbs[i];
-        for (int j = 0; j < 32; j++) {
-            if (x == 0 && i == (int)limbs.size() - 1) {
-                break;
-            }
-            if (result.size() == binary_point) {
-                result.push_back('.');
-            }
-            result.push_back(x & 1 ? '1' : '0');
-            x >>= 1;
+    if (is_zero()) {
+        return "0";
+    }
+    std::stringstream result_stream;
+    if (is_negative()) {
+        result_stream << '-';
+    }
+    if (exp() < 0) {
+        result_stream << '0';
+        result_stream << '.';
+        for (int i = 0; i < -1-exp(); i++) {
+            result_stream << '0';
         }
     }
-    while (result.size() < binary_point) {
-        result.push_back('0');
+    result_stream << '1';
+
+    std::stringstream significand_stream;
+    for (int i = 0; i < (int)limbs.size(); i++) {
+        significand_stream << std::format("{:032b}", limbs.get(i));
     }
-    if (result.size() == binary_point && binary_point != 0) {
-        result.push_back('.');
-        result.push_back('0');
+    std::string significand_str = significand_stream.str().substr(0, precision());
+    if (exp() >= 0 && exp() < (int)significand_str.size()) {
+        significand_str.insert(significand_str.begin() + exp(), '.');
     }
-    if (result.empty()) {
-        result.push_back('0');
+
+    result_stream << significand_str;
+    if (exp() >= (int)significand_str.size()) {
+        for (int i = significand_str.size(); i < exp() + 1; i++) {
+            result_stream << '0';
+        }
     }
-    if (sign < 0) {
-        result.push_back('-');
-    }
-    return std::string(result.rbegin(), result.rend());
+
+    return result_stream.str();
 }
 
 // simpler specialization for binary 
@@ -586,10 +473,17 @@ LongNum LongNum::from_binary_string(const std::string& number) {
         }
         limbs.push_back(limb);
     }
-    LongNum result(sign, binary_point, std::move(limbs));
-    if (binary_point < DEFAULT_PRECISION) {
-        result.set_precision(DEFAULT_PRECISION);
+    LongNum result;
+    result.limbs = Significand(std::vector<uint32_t>(limbs.rbegin(), limbs.rend()));
+    result._exp = 0;
+    if (result == 1) {
+        return 0;
     }
+    result._is_negative = sign == -1;
+    result._exp = result.limbs.precision() - binary_point;
+    std::size_t leading_zeros = result.limbs.leading_zeros();
+    result.limbs.remove_front_bits(leading_zeros + 1);
+    result._exp -= leading_zeros + 1;
     return result;
 }
 
@@ -603,6 +497,9 @@ std::string LongNum::to_string(unsigned int base) const {
     const std::string digits = "0123456789abcdef";
     std::string result;
     LongNum whole = this->truncate();
+    if (whole != 0) {
+        whole.set_precision(std::abs(exp()));
+    }
     while (whole != 0) {
         LongNum d = (whole / base).truncate();
         int rem = std::abs((whole - d * base).to_int());
@@ -612,7 +509,7 @@ std::string LongNum::to_string(unsigned int base) const {
     if (result.size() == 0) {
         result.push_back('0');
     }
-    if (sign < 0) {
+    if (is_negative()) {
         result.push_back('-');
     }
     std::reverse(result.begin(), result.end());
@@ -620,7 +517,8 @@ std::string LongNum::to_string(unsigned int base) const {
     if (frac != 0) {
         result.push_back('.');
     }
-    while (frac != 0) {
+    int num_frac_digits = (long double)(precision() - exp()) / std::log2l(base);
+    for (int i = 0; i < num_frac_digits && frac > 0; i++) {
         frac *= base;
         int rem = frac.truncate().to_int();
         result.push_back(digits[std::abs(rem)]);
@@ -677,36 +575,17 @@ LongNum LongNum::from_string(const std::string& number, unsigned int base) {
         throw std::invalid_argument(std::format("Invalid binary string: \"{}\"", number));
     }
     LongNum result;
+    result.set_precision(std::log2l(base) * (digits_end - digits_start + 1));
     for (int i = digits_start; i < (int)digits_end; i++) {
         std::size_t idx = digits.find_first_of(lnum[i]);
         assert(idx != std::string::npos);
-        LongNum d = idx;
         result *= base;
-        result += d;
+        result += idx;
     }
-
-    result.set_precision(4 * point);
     result /= LongNum(base).pow(point);
-    if (result != 0) {
-        result.sign = sign;
+    if (!result.is_zero()) {
+        result._is_negative = sign == -1;
     }
-
-    result.verify_invariants();
-    return result;
-}
-
-unsigned int LongNum::precision() const {
-    return binary_point;
-}
-
-void LongNum::set_precision(unsigned int precision) {
-    *this <<= precision - binary_point;
-    binary_point = precision;
-}
-
-LongNum LongNum::with_precision(unsigned int precision) const {
-    LongNum result = *this;
-    result.set_precision(precision);
     return result;
 }
 
