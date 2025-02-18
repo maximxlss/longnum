@@ -6,21 +6,17 @@
 
 LongNum calculate_pi(std::size_t precision) {
     LongNum result;
-    result.set_precision(precision);
 
     LongNum term = (2_longnum).with_precision(precision);
     result += term;
 
     // source: https://math.stackexchange.com/questions/14113/series-that-converge-to-pi-quickly
-    for (int n = 1; n <= (int)precision; n++) {
+    for (int n = 1; n <= precision; n++) {
         term >>= 1;
         term *= n * 2;
         term /= n * 2 + 1;
-        term.set_precision(precision - n + 2);
         result += term;
     }
-
-    result.set_precision(precision);
 
     return result;
 }
