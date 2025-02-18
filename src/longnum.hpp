@@ -7,9 +7,11 @@
 #include <string>
 #include <format>
 
+const int DEFAULT_PRECISION = 64;
+
 class LongNum {
-    int sign;
-    unsigned int binary_point;
+    int sign = 1;
+    unsigned int binary_point = DEFAULT_PRECISION;
     std::vector<uint32_t> limbs;
 
     LongNum(int _sign, unsigned int _binary_point, std::vector<uint32_t> _limbs);
@@ -18,11 +20,14 @@ class LongNum {
     inline void fix_invariants();
 
 public:
-    LongNum();
-    LongNum(long double value);
-
+    LongNum() = default;
+    ~LongNum() = default;
     LongNum(const LongNum&) = default;
-    LongNum& operator=(LongNum other);
+    LongNum(LongNum&&) = default;
+    LongNum& operator=(const LongNum& other) = default;
+    LongNum& operator=(LongNum&& other) = default;
+
+    LongNum(long double value);
 
     std::strong_ordering operator<=>(const LongNum& rhs) const;
     bool operator==(const LongNum& rhs) const;

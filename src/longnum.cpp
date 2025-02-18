@@ -3,8 +3,6 @@
 #include <cmath>
 #include <algorithm>
 
-const int DEFAULT_PRECISION = 64;
-
 inline void add_limbs(uint32_t& lhs, uint32_t rhs, int& carry) {
     uint64_t result = (uint64_t)lhs + rhs + carry;
     lhs = result;
@@ -46,18 +44,7 @@ inline void LongNum::fix_invariants() {
     verify_invariants();
 }
 
-LongNum::LongNum()
-    : sign(1),
-    binary_point(DEFAULT_PRECISION),
-    limbs()
-{
-    verify_invariants();
-}
-
 LongNum::LongNum(long double value)
-    : sign(1),
-    binary_point(0),
-    limbs()
 {
     int exponent;
     value = std::frexp(value, &exponent);
@@ -82,14 +69,6 @@ LongNum::LongNum(long double value)
     }
 
     verify_invariants();
-}
-
-
-LongNum& LongNum::operator=(LongNum rhs) {
-    std::swap(sign, rhs.sign);
-    std::swap(binary_point, rhs.binary_point);
-    std::swap(limbs, rhs.limbs);
-    return *this;
 }
 
 std::strong_ordering LongNum::operator<=>(const LongNum& rhs) const {
