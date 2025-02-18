@@ -5,6 +5,8 @@ First-year educational project done at HSE SE: C++ arbitrary precision library. 
 ### Description
 A class `LongNum` that implements fixed-point arithmetic (`+`, `-`, `*`, `/`) with selectable precision (the sizes of the numbers are unbounded though). Internally uses 32-bit limbs for not-terribly-slow computations. See [header file](./src/longnum.hpp) for details about the class exterior.
 
+See also [floating-point branch](https://github.com/maximxlss/longnum/tree/floating_point) for modification using floating point.
+
 ### Warning
 Requires GCC 13 or newer.
 
