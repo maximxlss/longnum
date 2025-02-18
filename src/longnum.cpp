@@ -668,8 +668,9 @@ LongNum LongNum::from_string(const std::string& number, unsigned int base) {
         result += d;
     }
 
-    result.set_precision(4 * point);
-    result /= LongNum(base).pow(point);
+    unsigned int precision = std::ceil(std::log2(base) * point);
+    result.set_precision(precision);
+    result /= LongNum(base).with_precision(precision).pow(point);
     if (result != 0) {
         result.sign = sign;
     }
