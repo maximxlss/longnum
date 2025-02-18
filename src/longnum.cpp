@@ -46,6 +46,10 @@ inline void LongNum::fix_invariants() {
 
 LongNum::LongNum(long double value)
 {
+    if (value == 0) {
+        return;
+    }
+
     int exponent;
     value = std::frexp(value, &exponent);
     
@@ -53,21 +57,21 @@ LongNum::LongNum(long double value)
         sign = -1;
         value = -value;
     }
-
-    unsigned long long mantissa = scalb(value, std::numeric_limits<double>::digits);
-    exponent -= std::numeric_limits<double>::digits;
     
-    while (mantissa) {
-        limbs.push_back(mantissa);
-        mantissa >>= 32;
+    std::vector<uint32_t> _limbs;
+    while (value) {
+        value = std::ldexp(value, 32);
+        long double float_limb;
+        value = std::modf(value, &float_limb);
+        _limbs.emplace_back(float_limb);
+        exponent -= 32;
     }
-    
+    while (exponent > 0) {
+        _limbs.emplace_back(0);
+        exponent -= 32;
+    }
     binary_point = -exponent;
-
-    if (binary_point < DEFAULT_PRECISION) {
-        set_precision(DEFAULT_PRECISION);
-    }
-
+    limbs = std::vector<uint32_t>(_limbs.rbegin(), _limbs.rend());
     verify_invariants();
 }
 
