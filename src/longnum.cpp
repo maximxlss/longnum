@@ -48,7 +48,7 @@ LongNum::LongNum(long double value) {
         set_precision(std::numeric_limits<long double>::digits);
     } else {
         // (will never happen) fallback to approximate precision
-        set_precision(std::numeric_limits<long double>::digits10 * 4);
+        set_precision(std::ceil(std::numeric_limits<long double>::digits10 * std::log2(10)));
     }
 }
 
