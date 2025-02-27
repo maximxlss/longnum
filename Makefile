@@ -21,7 +21,7 @@ endif
 
 COMPILE = $(CXX) $(CXXFLAGS)
 
-.phony: all run run.time run.valgrind test test.valgrind clean
+.phony: all run run.time run.valgrind run.callgrind test test.valgrind test.callgrind pi pi.time clean
 
 all: $(BUILD_FOLDER)/longnum.o
 
