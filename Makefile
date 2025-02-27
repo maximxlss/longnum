@@ -7,14 +7,12 @@ ifeq ($(RELEASE), 0)
 	BUILD_FOLDER:=$(BUILD_FOLDER)/debug
 else
 	BUILD_FOLDER:=$(BUILD_FOLDER)/release
-	CFLAGS=-DNDEBUG
-	CXXFLAGS+=-O3 -flto
+	CXXFLAGS+=-O3 -flto -DNDEBUG
 endif
 
 COVERAGE ?= 0
 ifeq ($(COVERAGE), 1)
 	BUILD_FOLDER:=$(BUILD_FOLDER)/coverage
-	CFLAGS=-DNDEBUG
 	CXXFLAGS+=-fprofile-arcs -ftest-coverage
 	POST_BUILD_COMMAND+=\
 		lcov --capture --directory $(BUILD_FOLDER) --output-file $(BUILD_FOLDER)/coverage.info;\
